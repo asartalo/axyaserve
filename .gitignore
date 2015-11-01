@@ -3,6 +3,12 @@
 *.a
 *.so
 
+# db
+*.db
+
+# OSX stuff
+*.DS_Store
+
 # Folders
 _obj
 _test
