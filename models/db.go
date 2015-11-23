@@ -1,4 +1,4 @@
-package model
+package models
 
 import (
 	"github.com/jmoiron/sqlx"
@@ -9,8 +9,8 @@ import (
 type AppDb interface {
 	DbStore() *sqlx.DB
 	Close() error
-	NewUser(string, string)
-	Authenticate(string, string)
+	NewUser(string, string) (User, error)
+	Authenticate(string, string) (User, error)
 }
 
 type appDb struct {
@@ -71,11 +71,11 @@ type User struct {
 }
 
 type UserAuthenticationError struct {
-	msg string
+	Msg string
 }
 
 func (e UserAuthenticationError) Error() string {
-	return e.msg
+	return e.Msg
 }
 
 func CreateDb(conn string) (*appDb, error) {

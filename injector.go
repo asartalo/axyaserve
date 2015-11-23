@@ -2,27 +2,28 @@ package axyaserve
 
 import (
 	"fmt"
-	"github.com/asartalo/go-html-transform/h5"
-	"github.com/asartalo/go-html-transform/html/transform"
 	"mime"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
 	"strings"
+
+	"github.com/asartalo/go-html-transform/h5"
+	"github.com/asartalo/go-html-transform/html/transform"
 )
 
 type injectorFunc func(string) string
 
-type injector struct {
+type Injector struct {
 	original  http.Handler
 	injectors map[string]injectorFunc
 }
 
-func Injector(original http.Handler) *injector {
-	return &injector{original, make(map[string]injectorFunc)}
+func NewInjector(original http.Handler) *Injector {
+	return &Injector{original, make(map[string]injectorFunc)}
 }
 
-func (lr *injector) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (lr *Injector) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var responseContentType string
 	var newContent string
 	var contentLength int
@@ -58,7 +59,7 @@ func (lr *injector) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(newContent))
 }
 
-func (lr *injector) Inject(mimetype string, injectionFunc func(string) string) {
+func (lr *Injector) Inject(mimetype string, injectionFunc func(string) string) {
 	lr.injectors[mimetype] = injectionFunc
 }
 

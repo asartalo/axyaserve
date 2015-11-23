@@ -1,19 +1,19 @@
 package controllers
 
 import (
-	server "github.com/asartalo/axyaserve"
-	"github.com/asartalo/axyaserve/model"
-	"github.com/gin-gonic/gin"
 	"net/http"
+
+	"github.com/asartalo/axyaserve/models"
+	"github.com/gin-gonic/gin"
 )
 
-type UsersControllers struct {
-	AppDb model.AppDb
+type Users struct {
+	AppDb models.AppDb
 }
 
-func (ctrl UsersControllers) PostUsers(c *gin.Context) {
-	responder := server.NewResponder(c)
-	var creds server.Credentials
+func (ctrl *Users) NewUser(c *gin.Context) {
+	responder := NewResponder(c)
+	var creds Credentials
 	err := c.BindJSON(&creds)
 	if err != nil {
 		responder.Error(

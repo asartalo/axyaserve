@@ -1,65 +1,84 @@
-package axyaserve
+package axyaserve_test
 
 import (
 	"fmt"
-	. "github.com/smartystreets/goconvey/convey"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
-	"testing"
+
+	ax "github.com/asartalo/axyaserve"
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
-func TestInjector(t *testing.T) {
-	Convey("Given a handler", t, func() {
+var _ = Describe("Injector", func() {
+	fmt.Println("YOYOO")
+	Context("Given a handler", func() {
 		var contentType string
-		w := httptest.NewRecorder()
-		req, _ := http.NewRequest("GET", "http://example.com/foo", nil)
+		var w *httptest.ResponseRecorder
+		var req *http.Request
+		var orig http.HandlerFunc
+		var inj *ax.Injector
 
-		orig := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Content-Type", contentType)
-			fmt.Fprint(w, "<html><head></head><body>Hello, client</body></html>")
+		var content []byte
+
+		BeforeEach(func() {
+			w = httptest.NewRecorder()
+			req, _ = http.NewRequest("GET", "http://example.com/foo", nil)
+
+			orig = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", contentType)
+				fmt.Fprint(w, "<html><head></head><body>Hello, client</body></html>")
+			})
+
+			inj = ax.NewInjector(orig)
+			inj.Inject("text/html", func(content string) string {
+				return content + "FOO"
+			})
 		})
 
-		inj := Injector(orig)
-		inj.Inject("text/html", func(content string) string {
-			return content + "FOO"
-		})
+		Context("When a request is sent", func() {
+			BeforeEach(func() {
+				contentType = "text/html; charset=utf-8"
+				inj.ServeHTTP(w, req)
+				content, _ = ioutil.ReadAll(w.Body)
+			})
 
-		Convey("When a request is sent", func() {
-			contentType = "text/html; charset=utf-8"
-			inj.ServeHTTP(w, req)
-			content, _ := ioutil.ReadAll(w.Body)
-
-			Convey("Its response should be injected with code", func() {
+			It("Injects code to response", func() {
 				expected := "<html><head></head><body>Hello, client</body></html>FOO"
-				So(string(content), ShouldEqual, expected)
+				Expect(string(content)).To(Equal(expected))
 			})
 
 		})
 
-		Convey("When response is of a different type", func() {
-			contentType = "text/plain; charset=utf-8"
-			inj.ServeHTTP(w, req)
-			content, _ := ioutil.ReadAll(w.Body)
+		Context("When response is of a different type", func() {
+			BeforeEach(func() {
+				contentType = "text/plain; charset=utf-8"
+				inj.ServeHTTP(w, req)
+				content, _ = ioutil.ReadAll(w.Body)
+			})
 
-			Convey("Its response should be not be injected", func() {
-				So(string(content), ShouldEqual, string(content))
+			It("Its response should be not be injected", func() {
+				Expect(string(content)).To(Equal(string(content)))
 			})
 		})
 	})
-}
 
-func TestLiveReloadInjectorFunc(t *testing.T) {
-	Convey("Given an html content", t, func() {
-		content := "<html><head></head><body>Hello, client</body></html>"
+	Context("Given an html content", func() {
+		var strcontent string
+		var result string
 
-		Convey("When passed to livereload injector", func() {
-			result := InjectLiveReload(content)
+		Context("When passed to livereload injector", func() {
+			BeforeEach(func() {
+				strcontent = "<html><head></head><body>Hello, client</body></html>"
+				result = ax.InjectLiveReload(strcontent)
+			})
 
-			Convey("It will contain livereload script", func() {
+			It("It will contain livereload script", func() {
 				expected := "<html><head></head><body>Hello, client<script src=\"http://localhost:35729/livereload.js\"></script></body></html>"
-				So(result, ShouldEqual, expected)
+				fmt.Println(result, expected)
+				Expect(result).To(Equal(expected))
 			})
 		})
 	})
-}
+})

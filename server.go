@@ -3,17 +3,14 @@ package axyaserve
 import (
 	b64 "encoding/base64"
 	"fmt"
-	"github.com/asartalo/axyaserve/model"
-	"github.com/gin-gonic/gin"
-	auth "github.com/rageix/ginAuth"
 	"net/http"
 	"os"
-)
 
-type Credentials struct {
-	Name     string `form:"name" json:"name" binding:"required"`
-	Password string `form:"password" json:"password" binding:"required"`
-}
+	"github.com/asartalo/axyaserve/controllers"
+	"github.com/asartalo/axyaserve/models"
+	"github.com/gin-gonic/gin"
+	auth "github.com/rageix/ginAuth"
+)
 
 func StartServer(port int, staticDir string) {
 	handler := MainHandler(port, staticDir)
@@ -22,63 +19,23 @@ func StartServer(port int, staticDir string) {
 	handler.Run(fmt.Sprintf(":%d", port))
 }
 
-type Responder struct {
-	context *gin.Context
-}
-
-func NewResponder(c *gin.Context) *Responder {
-	return &Responder{c}
-}
-
-func (j *Responder) Error(status int, message, details string) {
-	j.context.JSON(status, gin.H{"message": message, "details": details})
-}
-
-func (j *Responder) Okay(message string, payload gin.H) {
-	j.context.JSON(http.StatusOK, gin.H{"message": message, "payload": payload})
-}
-
-func (j *Responder) Created(message string, payload gin.H) {
-	j.context.JSON(http.StatusCreated, gin.H{"message": message, "payload": payload})
-}
-
 func MainHandler(port int, dir string) *gin.Engine {
 	engine := gin.Default()
 	conn := os.Getenv("AXYA_DB")
-	appDb, _ := model.CreateDb(conn)
+	appDb, _ := models.CreateDb(conn)
 
 	auth.HashKey, _ = b64.StdEncoding.DecodeString(os.Getenv("AXYA_HASHKEY"))
 	auth.BlockKey, _ = b64.StdEncoding.DecodeString(os.Getenv("AXYA_BLOCKKEY"))
 
 	api := engine.Group("/api")
 	{
-		api.POST("/users", func(c *gin.Context) {
-			responder := NewResponder(c)
-			var creds Credentials
-			err := c.BindJSON(&creds)
-			if err != nil {
-				responder.Error(
-					http.StatusBadRequest,
-					"Make sure credentials are complete.",
-					err.Error(),
-				)
-				return
-			}
-			user, err := appDb.NewUser(creds.Name, creds.Password)
-			if err != nil {
-				responder.Error(
-					http.StatusInternalServerError,
-					"Error: "+err.Error(),
-					err.Error(),
-				)
-				return
-			}
-			responder.Created("User created", gin.H{"name": user.Name})
-		})
+
+		users := &controllers.Users{appDb}
+		api.POST("/users", users.NewUser)
 
 		api.POST("/login", func(c *gin.Context) {
-			responder := NewResponder(c)
-			var creds Credentials
+			responder := controllers.NewResponder(c)
+			var creds controllers.Credentials
 			err := c.BindJSON(&creds)
 			if err != nil {
 				responder.Error(
@@ -115,7 +72,7 @@ func MainHandler(port int, dir string) *gin.Engine {
 		})
 
 		auth.Unauthorized = func(c *gin.Context) {
-			responder := NewResponder(c)
+			responder := controllers.NewResponder(c)
 			responder.Error(
 				http.StatusUnauthorized,
 				"Authentication error",
@@ -128,7 +85,7 @@ func MainHandler(port int, dir string) *gin.Engine {
 		authenticate.Use(auth.Use)
 	}
 
-	injector := Injector(http.FileServer(http.Dir(dir)))
+	injector := NewInjector(http.FileServer(http.Dir(dir)))
 	injector.Inject("text/html", InjectLiveReload)
 	wrapedInjector := gin.WrapH(injector)
 	engine.GET("/components/*filepath", wrapedInjector)
